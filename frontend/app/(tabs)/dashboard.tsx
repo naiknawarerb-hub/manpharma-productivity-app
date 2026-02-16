@@ -18,8 +18,11 @@ export default function DashboardScreen() {
     videos_in_progress: 0,
     upcoming_calendar_items: 0,
     pending_tasks: 0,
+    urgent_tasks: [] as any[],
     total_videos: 0,
     total_study_notes: 0,
+    monthly_income: 0,
+    pending_payments: 0,
   });
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
