@@ -16,7 +16,7 @@ export default function TabLayout() {
           paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '600',
         },
         headerStyle: {
@@ -38,11 +38,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="videos"
+        name="content"
         options={{
-          title: 'Videos',
+          title: 'Content',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="video" size={size} color={color} />
+            <MaterialCommunityIcons name="video-box" size={size} color={color} />
           ),
         }}
       />
@@ -56,11 +56,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="calendar"
+        name="business"
         options={{
-          title: 'Calendar',
+          title: 'Business',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="calendar" size={size} color={color} />
+            <MaterialCommunityIcons name="chart-line" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="ideas"
+        options={{
+          title: 'Ideas',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="lightbulb-on" size={size} color={color} />
           ),
         }}
       />
@@ -71,6 +80,19 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="checkbox-marked-circle-outline" size={size} color={color} />
           ),
+        }}
+      />
+      {/* Hide old screens */}
+      <Tabs.Screen
+        name="videos"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="calendar"
+        options={{
+          href: null,
         }}
       />
     </Tabs>
