@@ -313,4 +313,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
+  urgentTaskCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 8,
+    elevation: 2,
+    borderLeftWidth: 4,
+    borderLeftColor: '#f44336',
+  },
+  urgentTaskHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  urgentTaskTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginLeft: 8,
+    flex: 1,
+  },
+  urgentTaskDue: {
+    fontSize: 13,
+    color: '#f44336',
+    marginLeft: 28,
+    fontWeight: '500',
+  },
 });
