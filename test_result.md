@@ -330,5 +330,20 @@ agent_communication:
         agent: "testing"
         comment: "All Recurring Tasks endpoints tested successfully - CRUD operations working, Task instance generation working (creates regular tasks with correct due dates), Auto-generation endpoint working for all active due tasks, Next due date calculation working correctly for daily/weekly/monthly frequencies."
 
+  - task: "Enhanced Dashboard Stats"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "ENHANCEMENT - Enhanced dashboard stats endpoint to include urgent_tasks (array of tasks due within 3 days), monthly_income, and pending_payments fields"
+      - working: true
+        agent: "testing"
+        comment: "Enhanced Dashboard Stats tested successfully - All new fields present (urgent_tasks, monthly_income, pending_payments), urgent_tasks properly returns array, financial fields are correctly typed as numbers, all original fields maintained. Dashboard now provides comprehensive overview including revenue insights."
+
   - agent: "main"
     message: "ENHANCEMENT COMPLETE - Added 5 major new features to ManPharma Tutorials app: (1) Revenue & Monetization Tracker with monthly/category summaries, (2) Content Performance Analytics with top content tracking, (3) Idea Bank/Research Vault with search and tagging, (4) Recurring Tasks with auto-generation, (5) Enhanced Dashboard with income snapshot and urgent tasks alerts. Navigation updated to 6 tabs: Dashboard, Content (Videos+Calendar), Notes, Business (Revenue+Analytics), Ideas, Tasks. Ready for backend testing of NEW features."
