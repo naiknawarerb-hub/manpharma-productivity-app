@@ -105,6 +105,100 @@ class TaskUpdate(BaseModel):
     due_date: Optional[datetime] = None
     category: Optional[str] = None
 
+# ===================== NEW MODELS - REVENUE TRACKING =====================
+
+class Revenue(BaseModel):
+    amount: float
+    source_category: str  # Course Sales, Freelance, Other
+    source_detail: Optional[str] = ""  # Course name, Client name
+    platform: Optional[str] = ""  # YouTube, Udemy, Direct, etc.
+    payment_status: str = "Pending"  # Pending, Received
+    payment_date: datetime
+    description: Optional[str] = ""
+    created_date: datetime = Field(default_factory=datetime.utcnow)
+
+class RevenueUpdate(BaseModel):
+    amount: Optional[float] = None
+    source_category: Optional[str] = None
+    source_detail: Optional[str] = None
+    platform: Optional[str] = None
+    payment_status: Optional[str] = None
+    payment_date: Optional[datetime] = None
+    description: Optional[str] = None
+
+# ===================== CONTENT PERFORMANCE ANALYTICS =====================
+
+class ContentPerformance(BaseModel):
+    content_id: Optional[str] = ""
+    content_title: str
+    content_type: str  # Video, Post, Story, Course, Reel
+    platform: str  # YouTube, Instagram, Facebook, etc.
+    views: int = 0
+    likes: int = 0
+    comments: int = 0
+    shares: int = 0
+    reach: int = 0
+    recorded_date: datetime = Field(default_factory=datetime.utcnow)
+    created_date: datetime = Field(default_factory=datetime.utcnow)
+
+class ContentPerformanceUpdate(BaseModel):
+    content_id: Optional[str] = None
+    content_title: Optional[str] = None
+    content_type: Optional[str] = None
+    platform: Optional[str] = None
+    views: Optional[int] = None
+    likes: Optional[int] = None
+    comments: Optional[int] = None
+    shares: Optional[int] = None
+    reach: Optional[int] = None
+    recorded_date: Optional[datetime] = None
+
+# ===================== IDEA BANK / RESEARCH VAULT =====================
+
+class IdeaBank(BaseModel):
+    title: str
+    content: Optional[str] = ""
+    tags: List[str] = Field(default_factory=list)
+    category: Optional[str] = ""
+    links: List[str] = Field(default_factory=list)
+    priority: str = "medium"  # low, medium, high
+    status: str = "idea"  # idea, researching, ready, used
+    created_date: datetime = Field(default_factory=datetime.utcnow)
+    updated_date: datetime = Field(default_factory=datetime.utcnow)
+
+class IdeaBankUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    tags: Optional[List[str]] = None
+    category: Optional[str] = None
+    links: Optional[List[str]] = None
+    priority: Optional[str] = None
+    status: Optional[str] = None
+
+# ===================== RECURRING TASKS =====================
+
+class RecurringTask(BaseModel):
+    title: str
+    description: Optional[str] = ""
+    priority: str = "medium"
+    category: Optional[str] = ""
+    frequency: str = "weekly"  # daily, weekly, monthly
+    frequency_detail: Optional[str] = ""  # "Every Monday", "1st of month", etc.
+    next_due_date: datetime
+    last_generated_date: Optional[datetime] = None
+    is_active: bool = True
+    created_date: datetime = Field(default_factory=datetime.utcnow)
+
+class RecurringTaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    priority: Optional[str] = None
+    category: Optional[str] = None
+    frequency: Optional[str] = None
+    frequency_detail: Optional[str] = None
+    next_due_date: Optional[datetime] = None
+    is_active: Optional[bool] = None
+
 # ===================== VIDEO PROJECTS ROUTES =====================
 
 @api_router.post("/videos")
