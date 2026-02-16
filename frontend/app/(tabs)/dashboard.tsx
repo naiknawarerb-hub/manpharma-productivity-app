@@ -127,6 +127,45 @@ export default function DashboardScreen() {
         </View>
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Income Snapshot</Text>
+        <Card style={[styles.statCard, { borderLeftColor: '#4CAF50' }]}>
+          <View style={styles.statContent}>
+            <View style={[styles.iconContainer, { backgroundColor: '#4CAF5015' }]}>
+              <MaterialCommunityIcons name="currency-inr" size={32} color="#4CAF50" />
+            </View>
+            <View style={styles.statText}>
+              <Text style={styles.statValue}>₹{stats.monthly_income.toFixed(2)}</Text>
+              <Text style={styles.statTitle}>This Month (Received)</Text>
+              {stats.pending_payments > 0 && (
+                <Text style={styles.statSubtitle}>
+                  ₹{stats.pending_payments.toFixed(2)} pending
+                </Text>
+              )}
+            </View>
+          </View>
+        </Card>
+      </View>
+
+      {stats.urgent_tasks && stats.urgent_tasks.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Urgent Tasks ⚠️</Text>
+          {stats.urgent_tasks.map((task: any) => (
+            <Card key={task._id} style={styles.urgentTaskCard}>
+              <Card.Content>
+                <View style={styles.urgentTaskHeader}>
+                  <MaterialCommunityIcons name="alert-circle" size={20} color="#f44336" />
+                  <Text style={styles.urgentTaskTitle}>{task.title}</Text>
+                </View>
+                <Text style={styles.urgentTaskDue}>
+                  Due: {new Date(task.due_date).toLocaleDateString()}
+                </Text>
+              </Card.Content>
+            </Card>
+          ))}
+        </View>
+      )}
+
       <View style={styles.quickActions}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.actionButtonsRow}>
