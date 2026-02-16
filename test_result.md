@@ -317,15 +317,18 @@ agent_communication:
 
   - task: "Recurring tasks endpoints"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "NEW FEATURE - Created CRUD endpoints for recurring tasks with frequency settings (daily/weekly/monthly) and auto-generation endpoint that creates task instances"
+      - working: true
+        agent: "testing"
+        comment: "All Recurring Tasks endpoints tested successfully - CRUD operations working, Task instance generation working (creates regular tasks with correct due dates), Auto-generation endpoint working for all active due tasks, Next due date calculation working correctly for daily/weekly/monthly frequencies."
 
   - agent: "main"
     message: "ENHANCEMENT COMPLETE - Added 5 major new features to ManPharma Tutorials app: (1) Revenue & Monetization Tracker with monthly/category summaries, (2) Content Performance Analytics with top content tracking, (3) Idea Bank/Research Vault with search and tagging, (4) Recurring Tasks with auto-generation, (5) Enhanced Dashboard with income snapshot and urgent tasks alerts. Navigation updated to 6 tabs: Dashboard, Content (Videos+Calendar), Notes, Business (Revenue+Analytics), Ideas, Tasks. Ready for backend testing of NEW features."
