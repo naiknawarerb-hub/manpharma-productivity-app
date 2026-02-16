@@ -270,3 +270,53 @@ agent_communication:
     message: "Built complete ManPharma Tutorials productivity app with 5 main features: Dashboard with stats, Video production tracker with 6-stage workflow, Study notes with progress tracking, Content calendar with scheduling, and Task management. All backend CRUD endpoints implemented. Ready for backend testing."
   - agent: "testing"
     message: "Completed comprehensive backend API testing. All CRUD operations working correctly across Videos, Study Notes, Calendar, and Tasks endpoints. Dashboard stats endpoint returning proper aggregate data. Minor: Error handling returns HTTP 400 instead of 404 for non-existent resources, but functionality is correct. Success rate: 95.7% (22/23 tests passed). All core functionality verified and working."
+  - task: "Revenue tracking CRUD endpoints"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW FEATURE - Created CRUD endpoints for revenue tracking with amount, source category, platform, payment status, and monthly/category summary endpoints"
+
+  - task: "Content performance analytics endpoints"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW FEATURE - Created CRUD endpoints for content performance tracking with views, likes, comments, shares, and analytics endpoints for top content and trends"
+
+  - task: "Idea Bank CRUD endpoints"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW FEATURE - Created CRUD endpoints for idea bank with tags, links, categories, and search functionality"
+
+  - task: "Recurring tasks endpoints"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW FEATURE - Created CRUD endpoints for recurring tasks with frequency settings (daily/weekly/monthly) and auto-generation endpoint that creates task instances"
+
+  - agent: "main"
+    message: "ENHANCEMENT COMPLETE - Added 5 major new features to ManPharma Tutorials app: (1) Revenue & Monetization Tracker with monthly/category summaries, (2) Content Performance Analytics with top content tracking, (3) Idea Bank/Research Vault with search and tagging, (4) Recurring Tasks with auto-generation, (5) Enhanced Dashboard with income snapshot and urgent tasks alerts. Navigation updated to 6 tabs: Dashboard, Content (Videos+Calendar), Notes, Business (Revenue+Analytics), Ideas, Tasks. Ready for backend testing of NEW features."
