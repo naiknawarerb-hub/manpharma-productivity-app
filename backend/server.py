@@ -449,8 +449,8 @@ async def get_dashboard_stats():
                 urgent_tasks.append(task)
     
     # Get recent revenue (this month)
-    from datetime import datetime
-    first_day_of_month = datetime(now.year, now.month, 1)
+    import datetime as dt_module
+    first_day_of_month = dt_module.datetime(now.year, now.month, 1)
     revenues = await db.revenue.find({"payment_date": {"$gte": first_day_of_month}}).to_list(1000)
     monthly_income = sum(r.get('amount', 0) for r in revenues if r.get('payment_status') == 'Received')
     pending_payments = sum(r.get('amount', 0) for r in revenues if r.get('payment_status') == 'Pending')
