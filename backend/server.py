@@ -438,13 +438,460 @@ async def get_dashboard_stats():
     total_videos = len(videos)
     total_notes = await db.study_notes.count_documents({})
     
+    # Get urgent tasks (due within 3 days)
+    three_days_from_now = datetime.utcnow().timestamp() + (3 * 24 * 60 * 60)
+    urgent_tasks = []
+    for task in tasks:
+        if task.get('due_date'):
+            task_due = task['due_date'].timestamp() if isinstance(task['due_date'], datetime) else 0
+            if task_due <= three_days_from_now and task_due >= now.timestamp():
+                task['_id'] = str(task['_id'])
+                urgent_tasks.append(task)
+    
+    # Get recent revenue (this month)
+    from datetime import datetime
+    first_day_of_month = datetime(now.year, now.month, 1)
+    revenues = await db.revenue.find({"payment_date": {"$gte": first_day_of_month}}).to_list(1000)
+    monthly_income = sum(r.get('amount', 0) for r in revenues if r.get('payment_status') == 'Received')
+    pending_payments = sum(r.get('amount', 0) for r in revenues if r.get('payment_status') == 'Pending')
+    
     return {
         "videos_in_progress": videos_in_progress,
         "upcoming_calendar_items": upcoming_items,
         "pending_tasks": pending_tasks,
+        "urgent_tasks": urgent_tasks[:5],  # Top 5 urgent tasks
         "total_videos": total_videos,
-        "total_study_notes": total_notes
+        "total_study_notes": total_notes,
+        "monthly_income": monthly_income,
+        "pending_payments": pending_payments,
     }
+
+# ===================== REVENUE TRACKING ROUTES =====================
+
+@api_router.post("/revenue")
+async def create_revenue(revenue: Revenue):
+    revenue_dict = revenue.dict()
+    result = await db.revenue.insert_one(revenue_dict)
+    revenue_dict["_id"] = str(result.inserted_id)
+    return revenue_dict
+
+@api_router.get("/revenue")
+async def get_revenues():
+    revenues = await db.revenue.find().sort("payment_date", -1).to_list(1000)
+    for revenue in revenues:
+        revenue["_id"] = str(revenue["_id"])
+    return revenues
+
+@api_router.get("/revenue/{revenue_id}")
+async def get_revenue(revenue_id: str):
+    try:
+        revenue = await db.revenue.find_one({"_id": ObjectId(revenue_id)})
+        if not revenue:
+            raise HTTPException(status_code=404, detail="Revenue record not found")
+        revenue["_id"] = str(revenue["_id"])
+        return revenue
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.put("/revenue/{revenue_id}")
+async def update_revenue(revenue_id: str, revenue_update: RevenueUpdate):
+    try:
+        update_data = {k: v for k, v in revenue_update.dict().items() if v is not None}
+        if update_data:
+            result = await db.revenue.update_one(
+                {"_id": ObjectId(revenue_id)},
+                {"$set": update_data}
+            )
+            if result.matched_count == 0:
+                raise HTTPException(status_code=404, detail="Revenue record not found")
+        revenue = await db.revenue.find_one({"_id": ObjectId(revenue_id)})
+        revenue["_id"] = str(revenue["_id"])
+        return revenue
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.delete("/revenue/{revenue_id}")
+async def delete_revenue(revenue_id: str):
+    try:
+        result = await db.revenue.delete_one({"_id": ObjectId(revenue_id)})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Revenue record not found")
+        return {"message": "Revenue record deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/revenue/summary/monthly")
+async def get_monthly_revenue_summary():
+    """Get revenue summary grouped by month"""
+    revenues = await db.revenue.find().to_list(1000)
+    
+    monthly_data = {}
+    for revenue in revenues:
+        payment_date = revenue.get('payment_date')
+        if payment_date:
+            month_key = payment_date.strftime('%Y-%m')
+            if month_key not in monthly_data:
+                monthly_data[month_key] = {
+                    'month': month_key,
+                    'total_received': 0,
+                    'total_pending': 0,
+                    'count': 0
+                }
+            
+            amount = revenue.get('amount', 0)
+            if revenue.get('payment_status') == 'Received':
+                monthly_data[month_key]['total_received'] += amount
+            else:
+                monthly_data[month_key]['total_pending'] += amount
+            monthly_data[month_key]['count'] += 1
+    
+    return sorted(monthly_data.values(), key=lambda x: x['month'], reverse=True)
+
+@api_router.get("/revenue/summary/category")
+async def get_revenue_by_category():
+    """Get revenue summary grouped by category"""
+    revenues = await db.revenue.find({"payment_status": "Received"}).to_list(1000)
+    
+    category_data = {}
+    for revenue in revenues:
+        category = revenue.get('source_category', 'Other')
+        if category not in category_data:
+            category_data[category] = {
+                'category': category,
+                'total': 0,
+                'count': 0
+            }
+        category_data[category]['total'] += revenue.get('amount', 0)
+        category_data[category]['count'] += 1
+    
+    return list(category_data.values())
+
+# ===================== CONTENT PERFORMANCE ROUTES =====================
+
+@api_router.post("/performance")
+async def create_performance(performance: ContentPerformance):
+    performance_dict = performance.dict()
+    result = await db.performance.insert_one(performance_dict)
+    performance_dict["_id"] = str(result.inserted_id)
+    return performance_dict
+
+@api_router.get("/performance")
+async def get_performances():
+    performances = await db.performance.find().sort("recorded_date", -1).to_list(1000)
+    for perf in performances:
+        perf["_id"] = str(perf["_id"])
+    return performances
+
+@api_router.get("/performance/{performance_id}")
+async def get_performance(performance_id: str):
+    try:
+        perf = await db.performance.find_one({"_id": ObjectId(performance_id)})
+        if not perf:
+            raise HTTPException(status_code=404, detail="Performance record not found")
+        perf["_id"] = str(perf["_id"])
+        return perf
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.put("/performance/{performance_id}")
+async def update_performance(performance_id: str, performance_update: ContentPerformanceUpdate):
+    try:
+        update_data = {k: v for k, v in performance_update.dict().items() if v is not None}
+        if update_data:
+            result = await db.performance.update_one(
+                {"_id": ObjectId(performance_id)},
+                {"$set": update_data}
+            )
+            if result.matched_count == 0:
+                raise HTTPException(status_code=404, detail="Performance record not found")
+        perf = await db.performance.find_one({"_id": ObjectId(performance_id)})
+        perf["_id"] = str(perf["_id"])
+        return perf
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.delete("/performance/{performance_id}")
+async def delete_performance(performance_id: str):
+    try:
+        result = await db.performance.delete_one({"_id": ObjectId(performance_id)})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Performance record not found")
+        return {"message": "Performance record deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/performance/analytics/top-content")
+async def get_top_performing_content():
+    """Get top performing content by views and engagement"""
+    performances = await db.performance.find().to_list(1000)
+    
+    # Calculate engagement rate and sort
+    for perf in performances:
+        total_engagement = perf.get('likes', 0) + perf.get('comments', 0) + perf.get('shares', 0)
+        views = perf.get('views', 1)
+        perf['engagement_rate'] = (total_engagement / views * 100) if views > 0 else 0
+        perf['_id'] = str(perf['_id'])
+    
+    # Sort by views
+    top_by_views = sorted(performances, key=lambda x: x.get('views', 0), reverse=True)[:10]
+    
+    # Sort by engagement rate
+    top_by_engagement = sorted(performances, key=lambda x: x.get('engagement_rate', 0), reverse=True)[:10]
+    
+    return {
+        'top_by_views': top_by_views,
+        'top_by_engagement': top_by_engagement
+    }
+
+@api_router.get("/performance/analytics/trends")
+async def get_performance_trends():
+    """Get performance trends over time"""
+    performances = await db.performance.find().sort("recorded_date", 1).to_list(1000)
+    
+    trends = []
+    for perf in performances:
+        trends.append({
+            'date': perf.get('recorded_date').strftime('%Y-%m-%d') if perf.get('recorded_date') else '',
+            'title': perf.get('content_title', ''),
+            'platform': perf.get('platform', ''),
+            'views': perf.get('views', 0),
+            'likes': perf.get('likes', 0),
+            'comments': perf.get('comments', 0)
+        })
+    
+    return trends
+
+# ===================== IDEA BANK ROUTES =====================
+
+@api_router.post("/ideas")
+async def create_idea(idea: IdeaBank):
+    idea_dict = idea.dict()
+    result = await db.ideas.insert_one(idea_dict)
+    idea_dict["_id"] = str(result.inserted_id)
+    return idea_dict
+
+@api_router.get("/ideas")
+async def get_ideas():
+    ideas = await db.ideas.find().sort("created_date", -1).to_list(1000)
+    for idea in ideas:
+        idea["_id"] = str(idea["_id"])
+    return ideas
+
+@api_router.get("/ideas/{idea_id}")
+async def get_idea(idea_id: str):
+    try:
+        idea = await db.ideas.find_one({"_id": ObjectId(idea_id)})
+        if not idea:
+            raise HTTPException(status_code=404, detail="Idea not found")
+        idea["_id"] = str(idea["_id"])
+        return idea
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.put("/ideas/{idea_id}")
+async def update_idea(idea_id: str, idea_update: IdeaBankUpdate):
+    try:
+        update_data = {k: v for k, v in idea_update.dict().items() if v is not None}
+        if update_data:
+            update_data["updated_date"] = datetime.utcnow()
+            result = await db.ideas.update_one(
+                {"_id": ObjectId(idea_id)},
+                {"$set": update_data}
+            )
+            if result.matched_count == 0:
+                raise HTTPException(status_code=404, detail="Idea not found")
+        idea = await db.ideas.find_one({"_id": ObjectId(idea_id)})
+        idea["_id"] = str(idea["_id"])
+        return idea
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.delete("/ideas/{idea_id}")
+async def delete_idea(idea_id: str):
+    try:
+        result = await db.ideas.delete_one({"_id": ObjectId(idea_id)})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Idea not found")
+        return {"message": "Idea deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/ideas/search/{query}")
+async def search_ideas(query: str):
+    """Search ideas by title, content, or tags"""
+    ideas = await db.ideas.find({
+        "$or": [
+            {"title": {"$regex": query, "$options": "i"}},
+            {"content": {"$regex": query, "$options": "i"}},
+            {"tags": {"$regex": query, "$options": "i"}},
+            {"category": {"$regex": query, "$options": "i"}}
+        ]
+    }).to_list(1000)
+    
+    for idea in ideas:
+        idea["_id"] = str(idea["_id"])
+    return ideas
+
+# ===================== RECURRING TASKS ROUTES =====================
+
+@api_router.post("/recurring-tasks")
+async def create_recurring_task(task: RecurringTask):
+    task_dict = task.dict()
+    result = await db.recurring_tasks.insert_one(task_dict)
+    task_dict["_id"] = str(result.inserted_id)
+    return task_dict
+
+@api_router.get("/recurring-tasks")
+async def get_recurring_tasks():
+    tasks = await db.recurring_tasks.find().to_list(1000)
+    for task in tasks:
+        task["_id"] = str(task["_id"])
+    return tasks
+
+@api_router.get("/recurring-tasks/{task_id}")
+async def get_recurring_task(task_id: str):
+    try:
+        task = await db.recurring_tasks.find_one({"_id": ObjectId(task_id)})
+        if not task:
+            raise HTTPException(status_code=404, detail="Recurring task not found")
+        task["_id"] = str(task["_id"])
+        return task
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.put("/recurring-tasks/{task_id}")
+async def update_recurring_task(task_id: str, task_update: RecurringTaskUpdate):
+    try:
+        update_data = {k: v for k, v in task_update.dict().items() if v is not None}
+        if update_data:
+            result = await db.recurring_tasks.update_one(
+                {"_id": ObjectId(task_id)},
+                {"$set": update_data}
+            )
+            if result.matched_count == 0:
+                raise HTTPException(status_code=404, detail="Recurring task not found")
+        task = await db.recurring_tasks.find_one({"_id": ObjectId(task_id)})
+        task["_id"] = str(task["_id"])
+        return task
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.delete("/recurring-tasks/{task_id}")
+async def delete_recurring_task(task_id: str):
+    try:
+        result = await db.recurring_tasks.delete_one({"_id": ObjectId(task_id)})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Recurring task not found")
+        return {"message": "Recurring task deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/recurring-tasks/{task_id}/generate")
+async def generate_task_from_recurring(task_id: str):
+    """Generate a new task instance from recurring task"""
+    try:
+        recurring_task = await db.recurring_tasks.find_one({"_id": ObjectId(task_id)})
+        if not recurring_task:
+            raise HTTPException(status_code=404, detail="Recurring task not found")
+        
+        # Create new task from recurring template
+        new_task = {
+            "title": recurring_task['title'],
+            "description": recurring_task.get('description', ''),
+            "priority": recurring_task.get('priority', 'medium'),
+            "status": "pending",
+            "due_date": recurring_task['next_due_date'],
+            "category": recurring_task.get('category', ''),
+            "created_date": datetime.utcnow()
+        }
+        
+        result = await db.tasks.insert_one(new_task)
+        new_task["_id"] = str(result.inserted_id)
+        
+        # Calculate next due date based on frequency
+        from datetime import timedelta
+        current_due = recurring_task['next_due_date']
+        frequency = recurring_task.get('frequency', 'weekly')
+        
+        if frequency == 'daily':
+            next_due = current_due + timedelta(days=1)
+        elif frequency == 'weekly':
+            next_due = current_due + timedelta(weeks=1)
+        elif frequency == 'monthly':
+            # Add one month (approximately)
+            next_due = current_due + timedelta(days=30)
+        else:
+            next_due = current_due + timedelta(weeks=1)
+        
+        # Update recurring task with new next_due_date
+        await db.recurring_tasks.update_one(
+            {"_id": ObjectId(task_id)},
+            {"$set": {
+                "next_due_date": next_due,
+                "last_generated_date": datetime.utcnow()
+            }}
+        )
+        
+        return new_task
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/recurring-tasks/auto-generate")
+async def auto_generate_recurring_tasks():
+    """Auto-generate tasks from all active recurring tasks that are due"""
+    try:
+        now = datetime.utcnow()
+        recurring_tasks = await db.recurring_tasks.find({
+            "is_active": True,
+            "next_due_date": {"$lte": now}
+        }).to_list(1000)
+        
+        generated_count = 0
+        for recurring_task in recurring_tasks:
+            # Create new task
+            new_task = {
+                "title": recurring_task['title'],
+                "description": recurring_task.get('description', ''),
+                "priority": recurring_task.get('priority', 'medium'),
+                "status": "pending",
+                "due_date": recurring_task['next_due_date'],
+                "category": recurring_task.get('category', ''),
+                "created_date": datetime.utcnow()
+            }
+            
+            await db.tasks.insert_one(new_task)
+            
+            # Calculate next due date
+            from datetime import timedelta
+            current_due = recurring_task['next_due_date']
+            frequency = recurring_task.get('frequency', 'weekly')
+            
+            if frequency == 'daily':
+                next_due = current_due + timedelta(days=1)
+            elif frequency == 'weekly':
+                next_due = current_due + timedelta(weeks=1)
+            elif frequency == 'monthly':
+                next_due = current_due + timedelta(days=30)
+            else:
+                next_due = current_due + timedelta(weeks=1)
+            
+            # Update recurring task
+            await db.recurring_tasks.update_one(
+                {"_id": recurring_task["_id"]},
+                {"$set": {
+                    "next_due_date": next_due,
+                    "last_generated_date": now
+                }}
+            )
+            
+            generated_count += 1
+        
+        return {
+            "message": f"Generated {generated_count} tasks from recurring templates",
+            "count": generated_count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 # Include the router in the main app
 app.include_router(api_router)
