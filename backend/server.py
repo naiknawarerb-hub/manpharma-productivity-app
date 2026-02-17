@@ -975,3 +975,307 @@ logger = logging.getLogger(__name__)
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+# ===================== SOCIAL MEDIA AUTOMATION ROUTES =====================
+
+# Social Connections Management
+@api_router.post("/social/connections")
+async def create_social_connection(connection: SocialConnection):
+    connection_dict = connection.dict()
+    result = await db.social_connections.insert_one(connection_dict)
+    connection_dict["_id"] = str(result.inserted_id)
+    return connection_dict
+
+@api_router.get("/social/connections")
+async def get_social_connections():
+    connections = await db.social_connections.find().to_list(1000)
+    for conn in connections:
+        conn["_id"] = str(conn["_id"])
+        # Don't expose full tokens in list view for security
+        if conn.get("access_token"):
+            conn["access_token"] = conn["access_token"][:10] + "..."
+        if conn.get("refresh_token"):
+            conn["refresh_token"] = "***"
+    return connections
+
+@api_router.get("/social/connections/{connection_id}")
+async def get_social_connection(connection_id: str):
+    try:
+        conn = await db.social_connections.find_one({"_id": ObjectId(connection_id)})
+        if not conn:
+            raise HTTPException(status_code=404, detail="Connection not found")
+        conn["_id"] = str(conn["_id"])
+        return conn
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.put("/social/connections/{connection_id}")
+async def update_social_connection(connection_id: str, connection_update: SocialConnectionUpdate):
+    try:
+        update_data = {k: v for k, v in connection_update.dict().items() if v is not None}
+        if update_data:
+            result = await db.social_connections.update_one(
+                {"_id": ObjectId(connection_id)},
+                {"$set": update_data}
+            )
+            if result.matched_count == 0:
+                raise HTTPException(status_code=404, detail="Connection not found")
+        conn = await db.social_connections.find_one({"_id": ObjectId(connection_id)})
+        conn["_id"] = str(conn["_id"])
+        return conn
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.delete("/social/connections/{connection_id}")
+async def delete_social_connection(connection_id: str):
+    try:
+        result = await db.social_connections.delete_one({"_id": ObjectId(connection_id)})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Connection not found")
+        return {"message": "Connection deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Scheduled Posts Management
+@api_router.post("/social/scheduled-posts")
+async def create_scheduled_post(post: ScheduledPost):
+    post_dict = post.dict()
+    result = await db.scheduled_posts.insert_one(post_dict)
+    post_dict["_id"] = str(result.inserted_id)
+    return post_dict
+
+@api_router.get("/social/scheduled-posts")
+async def get_scheduled_posts(status: Optional[str] = None, platform: Optional[str] = None):
+    query = {}
+    if status:
+        query["status"] = status
+    if platform:
+        query["platform"] = platform
+    
+    posts = await db.scheduled_posts.find(query).sort("scheduled_date", 1).to_list(1000)
+    for post in posts:
+        post["_id"] = str(post["_id"])
+    return posts
+
+@api_router.get("/social/scheduled-posts/{post_id}")
+async def get_scheduled_post(post_id: str):
+    try:
+        post = await db.scheduled_posts.find_one({"_id": ObjectId(post_id)})
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+        post["_id"] = str(post["_id"])
+        return post
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.put("/social/scheduled-posts/{post_id}")
+async def update_scheduled_post(post_id: str, post_update: ScheduledPostUpdate):
+    try:
+        update_data = {k: v for k, v in post_update.dict().items() if v is not None}
+        if update_data:
+            result = await db.scheduled_posts.update_one(
+                {"_id": ObjectId(post_id)},
+                {"$set": update_data}
+            )
+            if result.matched_count == 0:
+                raise HTTPException(status_code=404, detail="Post not found")
+        post = await db.scheduled_posts.find_one({"_id": ObjectId(post_id)})
+        post["_id"] = str(post["_id"])
+        return post
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.delete("/social/scheduled-posts/{post_id}")
+async def delete_scheduled_post(post_id: str):
+    try:
+        result = await db.scheduled_posts.delete_one({"_id": ObjectId(post_id)})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Post not found")
+        return {"message": "Scheduled post deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Content Calendar View
+@api_router.get("/social/calendar")
+async def get_content_calendar(start_date: Optional[str] = None, end_date: Optional[str] = None):
+    """Get calendar view of scheduled posts"""
+    query = {}
+    
+    if start_date and end_date:
+        from datetime import datetime as dt
+        try:
+            start = dt.fromisoformat(start_date.replace('Z', '+00:00'))
+            end = dt.fromisoformat(end_date.replace('Z', '+00:00'))
+            query["scheduled_date"] = {"$gte": start, "$lte": end}
+        except:
+            pass
+    
+    posts = await db.scheduled_posts.find(query).sort("scheduled_date", 1).to_list(1000)
+    
+    # Group by date for calendar view
+    calendar_data = {}
+    for post in posts:
+        post["_id"] = str(post["_id"])
+        date_key = post["scheduled_date"].strftime('%Y-%m-%d') if post.get("scheduled_date") else "unscheduled"
+        
+        if date_key not in calendar_data:
+            calendar_data[date_key] = []
+        calendar_data[date_key].append(post)
+    
+    return calendar_data
+
+# Google Sheets Integration
+@api_router.post("/social/sync-sheets")
+async def sync_from_google_sheets(sheet_config: GoogleSheetsConfig):
+    """
+    Placeholder for Google Sheets sync - will be implemented with actual OAuth
+    For now, accepts manual data or returns instructions
+    """
+    # Store config
+    config_dict = sheet_config.dict()
+    config_dict["last_sync"] = datetime.utcnow()
+    
+    # Check if config exists
+    existing = await db.sheets_config.find_one({"sheet_id": sheet_config.sheet_id})
+    if existing:
+        await db.sheets_config.update_one(
+            {"sheet_id": sheet_config.sheet_id},
+            {"$set": config_dict}
+        )
+    else:
+        await db.sheets_config.insert_one(config_dict)
+    
+    return {
+        "message": "Google Sheets configuration saved. OAuth integration pending.",
+        "instructions": "To enable auto-sync, you'll need to: 1) Create Google Cloud project, 2) Enable Google Sheets API, 3) Create OAuth credentials, 4) Connect in app",
+        "sheet_id": sheet_config.sheet_id,
+        "status": "configured"
+    }
+
+@api_router.get("/social/sheets-config")
+async def get_sheets_config():
+    config = await db.sheets_config.find_one()
+    if config:
+        config["_id"] = str(config["_id"])
+    return config or {"message": "No Google Sheets configured"}
+
+# Manual Publish Post
+@api_router.post("/social/publish/{post_id}")
+async def publish_post_now(post_id: str):
+    """
+    Manually trigger posting (placeholder - actual API integration pending)
+    """
+    try:
+        post = await db.scheduled_posts.find_one({"_id": ObjectId(post_id)})
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        # Placeholder for actual posting logic
+        # In real implementation, this would call Meta/YouTube APIs
+        
+        # Update post status
+        await db.scheduled_posts.update_one(
+            {"_id": ObjectId(post_id)},
+            {"$set": {"status": "posted"}}
+        )
+        
+        # Create posting log
+        log_entry = {
+            "post_id": post_id,
+            "platform": post.get("platform", "unknown"),
+            "topic": post.get("topic", ""),
+            "posted_at": datetime.utcnow(),
+            "status": "success",
+            "platform_post_id": "placeholder_" + post_id[:8],
+            "error_message": None,
+            "response_data": {"note": "Placeholder - OAuth integration pending"}
+        }
+        await db.posting_logs.insert_one(log_entry)
+        
+        return {
+            "message": "Post published successfully (placeholder)",
+            "post_id": post_id,
+            "platform": post.get("platform"),
+            "note": "Actual posting will work once OAuth is configured"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Posting History/Logs
+@api_router.get("/social/posting-logs")
+async def get_posting_logs(platform: Optional[str] = None, limit: int = 50):
+    query = {}
+    if platform:
+        query["platform"] = platform
+    
+    logs = await db.posting_logs.find(query).sort("posted_at", -1).limit(limit).to_list(limit)
+    for log in logs:
+        log["_id"] = str(log["_id"])
+    return logs
+
+# OAuth Placeholders (to be implemented with actual OAuth flows)
+@api_router.get("/social/oauth/meta/authorize")
+async def meta_oauth_authorize():
+    return {
+        "message": "Meta OAuth flow placeholder",
+        "instructions": "To enable: 1) Create Meta Developer App, 2) Add Instagram/Facebook permissions, 3) Get App ID and Secret, 4) Configure OAuth redirect URL",
+        "redirect_url_needed": "/api/social/oauth/meta/callback"
+    }
+
+@api_router.get("/social/oauth/youtube/authorize")
+async def youtube_oauth_authorize():
+    return {
+        "message": "YouTube OAuth flow placeholder",
+        "instructions": "To enable: 1) Create Google Cloud project, 2) Enable YouTube Data API, 3) Create OAuth 2.0 credentials, 4) Configure authorized redirect URIs",
+        "redirect_url_needed": "/api/social/oauth/youtube/callback"
+    }
+
+@api_router.get("/social/oauth/sheets/authorize")
+async def sheets_oauth_authorize():
+    return {
+        "message": "Google Sheets OAuth flow placeholder",
+        "instructions": "To enable: 1) Use same Google Cloud project as YouTube, 2) Enable Google Sheets API, 3) Use same OAuth credentials",
+        "redirect_url_needed": "/api/social/oauth/sheets/callback"
+    }
+
+# Check for due posts (will be called by background job)
+@api_router.post("/social/check-due-posts")
+async def check_and_post_due_posts():
+    """Check for posts that are due and post them"""
+    now = datetime.utcnow()
+    
+    # Find posts that are scheduled and due
+    posts = await db.scheduled_posts.find({
+        "status": "scheduled",
+        "scheduled_date": {"$lte": now}
+    }).to_list(100)
+    
+    posted_count = 0
+    for post in posts:
+        # In real implementation, this would call the appropriate platform API
+        # For now, just mark as posted and create log
+        
+        await db.scheduled_posts.update_one(
+            {"_id": post["_id"]},
+            {"$set": {"status": "posted"}}
+        )
+        
+        log_entry = {
+            "post_id": str(post["_id"]),
+            "platform": post.get("platform", "unknown"),
+            "topic": post.get("topic", ""),
+            "posted_at": now,
+            "status": "success",
+            "platform_post_id": "auto_" + str(post["_id"])[:8],
+            "error_message": None,
+            "response_data": {"note": "Auto-posted (OAuth pending)"}
+        }
+        await db.posting_logs.insert_one(log_entry)
+        posted_count += 1
+    
+    return {
+        "message": f"Checked and posted {posted_count} due posts",
+        "count": posted_count,
+        "note": "Actual API posting will work once OAuth is configured"
+    }
+
