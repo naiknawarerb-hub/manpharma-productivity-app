@@ -9,8 +9,6 @@ import {
   TextInput,
   Modal,
   Alert,
-  Platform,
-  Keyboard,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Button, Chip } from 'react-native-paper';
@@ -36,6 +34,7 @@ export default function TasksScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [showDueDatePicker, setShowDueDatePicker] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
   
   const [formData, setFormData] = useState({
     title: '',
@@ -47,6 +46,7 @@ export default function TasksScreen() {
   });
 
   const priorities = ['low', 'medium', 'high'];
+  const statuses = ['pending', 'in_progress', 'completed'];
   const categories = ['Content', 'Editing', 'Research', 'Admin', 'Other'];
 
   const fetchTasks = async () => {
@@ -69,22 +69,6 @@ export default function TasksScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     fetchTasks();
-  };
-
-  const toggleTaskComplete = async (task: Task) => {
-    const newStatus = task.status === 'completed' ? 'pending' : 'completed';
-    
-    try {
-      await fetch(`${BACKEND_URL}/api/tasks/${task._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      fetchTasks();
-    } catch (error) {
-      console.error('Error updating task:', error);
-      Alert.alert('Error', 'Failed to update task status');
-    }
   };
 
   const openModal = (task?: Task) => {
@@ -173,8 +157,17 @@ export default function TasksScreen() {
     }
   };
 
-  const pendingTasks = tasks.filter(t => t.status !== 'completed');
-  const completedTasks = tasks.filter(t => t.status === 'completed');
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed': return 'check-circle';
+      case 'in_progress': return 'progress-clock';
+      default: return 'circle-outline';
+    }
+  };
+
+  const filteredTasks = filterStatus === 'all' 
+    ? tasks 
+    : tasks.filter(task => task.status === filterStatus);
 
   if (loading) {
     return (
@@ -187,6 +180,25 @@ export default function TasksScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.filterContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {['all', ...statuses].map((status) => (
+            <TouchableOpacity
+              key={status}
+              onPress={() => setFilterStatus(status)}
+            >
+              <Chip
+                selected={filterStatus === status}
+                style={styles.filterChip}
+                selectedColor="#6200ee"
+              >
+                {status === 'all' ? 'All' : status.replace('_', ' ')}
+              </Chip>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
@@ -194,99 +206,82 @@ export default function TasksScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <Text style={styles.sectionTitle}>Active Tasks</Text>
-        {pendingTasks.length === 0 ? (
+        {filteredTasks.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons name="checkbox-marked-circle-outline" size={48} color="#ccc" />
-            <Text style={styles.emptyText}>No active tasks</Text>
+            <MaterialCommunityIcons name="clipboard-check-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyText}>No tasks found</Text>
+            <Text style={styles.emptySubtext}>Create your first task</Text>
           </View>
         ) : (
-          pendingTasks.map((task) => (
+          filteredTasks.map((task) => (
             <Card key={task._id} style={styles.taskCard}>
-              <Card.Content>
-                <View style={styles.taskRow}>
-                  <TouchableOpacity
-                    style={styles.checkbox}
-                    onPress={() => toggleTaskComplete(task)}
-                  >
-                    <MaterialCommunityIcons
-                      name="checkbox-blank-circle-outline"
-                      size={28}
-                      color="#6200ee"
-                    />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.taskContent}
-                    onPress={() => openModal(task)}
-                  >
-                    <Text style={styles.taskTitle}>{task.title}</Text>
-                    {task.description ? (
-                      <Text style={styles.taskDescription} numberOfLines={2}>
-                        {task.description}
-                      </Text>
-                    ) : null}
-                    <View style={styles.taskMeta}>
-                      <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(task.priority) }]}>
-                        <Text style={styles.priorityText}>{task.priority}</Text>
-                      </View>
-                      {task.category ? (
-                        <Chip style={styles.categoryBadge} textStyle={styles.categoryText}>
-                          {task.category}
-                        </Chip>
-                      ) : null}
-                      {task.due_date && (
-                        <Text style={styles.dueDate}>
-                          {new Date(task.due_date).toLocaleDateString()}
-                        </Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity onPress={() => deleteTask(task._id)}>
-                    <MaterialCommunityIcons name="delete" size={24} color="#f44336" />
-                  </TouchableOpacity>
-                </View>
-              </Card.Content>
-            </Card>
-          ))
-        )}
-
-        {completedTasks.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Completed Tasks</Text>
-            {completedTasks.map((task) => (
-              <Card key={task._id} style={[styles.taskCard, styles.completedCard]}>
+              <TouchableOpacity onPress={() => openModal(task)}>
                 <Card.Content>
-                  <View style={styles.taskRow}>
-                    <TouchableOpacity
-                      style={styles.checkbox}
-                      onPress={() => toggleTaskComplete(task)}
-                    >
-                      <MaterialCommunityIcons
-                        name="checkbox-marked-circle"
-                        size={28}
-                        color="#4CAF50"
-                      />
-                    </TouchableOpacity>
-
-                    <View style={styles.taskContent}>
-                      <Text style={[styles.taskTitle, styles.completedText]}>{task.title}</Text>
-                      {task.description ? (
-                        <Text style={[styles.taskDescription, styles.completedText]} numberOfLines={1}>
-                          {task.description}
+                  <View style={styles.taskHeader}>
+                    <View style={styles.taskTitleContainer}>
+                      <View style={styles.titleRow}>
+                        <MaterialCommunityIcons
+                          name={getStatusIcon(task.status)}
+                          size={24}
+                          color={task.status === 'completed' ? '#4CAF50' : '#666'}
+                        />
+                        <Text
+                          style={[
+                            styles.taskTitle,
+                            task.status === 'completed' && styles.completedTitle,
+                          ]}
+                        >
+                          {task.title}
                         </Text>
-                      ) : null}
+                      </View>
+                      <View style={styles.badgesRow}>
+                        <View
+                          style={[
+                            styles.priorityBadge,
+                            { backgroundColor: getPriorityColor(task.priority) },
+                          ]}
+                        >
+                          <Text style={styles.priorityText}>{task.priority}</Text>
+                        </View>
+                        {task.category ? (
+                          <Chip style={styles.categoryBadge} textStyle={styles.categoryText}>
+                            {task.category}
+                          </Chip>
+                        ) : null}
+                      </View>
                     </View>
-
                     <TouchableOpacity onPress={() => deleteTask(task._id)}>
-                      <MaterialCommunityIcons name="delete" size={24} color="#999" />
+                      <MaterialCommunityIcons name="delete" size={24} color="#f44336" />
                     </TouchableOpacity>
                   </View>
+
+                  {task.description ? (
+                    <Text style={styles.taskDescription} numberOfLines={2}>
+                      {task.description}
+                    </Text>
+                  ) : null}
+
+                  {task.due_date && (
+                    <View style={styles.dueDateContainer}>
+                      <MaterialCommunityIcons
+                        name="calendar-clock"
+                        size={16}
+                        color={new Date(task.due_date) < new Date() ? '#f44336' : '#666'}
+                      />
+                      <Text
+                        style={[
+                          styles.dueDateText,
+                          new Date(task.due_date) < new Date() && styles.overdue,
+                        ]}
+                      >
+                        {new Date(task.due_date).toLocaleDateString()}
+                      </Text>
+                    </View>
+                  )}
                 </Card.Content>
-              </Card>
-            ))}
-          </>
+              </TouchableOpacity>
+            </Card>
+          ))
         )}
       </ScrollView>
 
@@ -300,24 +295,18 @@ export default function TasksScreen() {
         transparent={true}
         onRequestClose={() => setModalVisible(false)}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => {
-            Keyboard.dismiss();
-          }}
-        >
-          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {selectedTask ? 'Edit Task' : 'New Task'}
-              </Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalScrollView}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {selectedTask ? 'Edit Task' : 'New Task'}
+                </Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <MaterialCommunityIcons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
 
-            <ScrollView>
               <TextInput
                 style={styles.input}
                 placeholder="Task Title *"
@@ -343,14 +332,28 @@ export default function TasksScreen() {
                   >
                     <Chip
                       selected={formData.priority === priority}
-                      style={[
-                        styles.chip,
-                        formData.priority === priority && { backgroundColor: getPriorityColor(priority) + '30' }
-                      ]}
+                      style={styles.chip}
                       selectedColor={getPriorityColor(priority)}
-                      textStyle={formData.priority === priority && { color: getPriorityColor(priority), fontWeight: 'bold' }}
                     >
                       {priority}
+                    </Chip>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.label}>Status</Text>
+              <View style={styles.chipsContainer}>
+                {statuses.map((status) => (
+                  <TouchableOpacity
+                    key={status}
+                    onPress={() => setFormData({ ...formData, status })}
+                  >
+                    <Chip
+                      selected={formData.status === status}
+                      style={styles.chip}
+                      selectedColor="#6200ee"
+                    >
+                      {status.replace('_', ' ')}
                     </Chip>
                   </TouchableOpacity>
                 ))}
@@ -388,9 +391,9 @@ export default function TasksScreen() {
                 <DateTimePicker
                   value={formData.due_date}
                   mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  display="default"
                   onChange={(event, selectedDate) => {
-                    setShowDueDatePicker(Platform.OS === 'ios');
+                    setShowDueDatePicker(false);
                     if (selectedDate) {
                       setFormData({ ...formData, due_date: selectedDate });
                     }
@@ -406,9 +409,9 @@ export default function TasksScreen() {
               >
                 {selectedTask ? 'Update Task' : 'Create Task'}
               </Button>
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
       </Modal>
     </View>
   );
@@ -437,21 +440,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 12,
-    marginTop: 8,
+  filterContainer: {
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  filterChip: {
+    marginRight: 8,
   },
   emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 32,
+    paddingTop: 100,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
     color: '#999',
-    marginTop: 12,
+    marginTop: 8,
   },
   taskCard: {
     marginBottom: 12,
@@ -459,67 +473,78 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     elevation: 2,
   },
-  completedCard: {
-    backgroundColor: '#f9f9f9',
-    opacity: 0.8,
-  },
-  taskRow: {
+  taskHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  checkbox: {
-    marginRight: 12,
-    paddingTop: 2,
-  },
-  taskContent: {
+  taskTitleContainer: {
     flex: 1,
+    marginRight: 12,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   taskTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#1a1a1a',
-    marginBottom: 4,
+    marginLeft: 8,
+    flex: 1,
   },
-  completedText: {
+  completedTitle: {
     textDecorationLine: 'line-through',
     color: '#999',
   },
-  taskDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  taskMeta: {
+  badgesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    marginTop: 4,
   },
   priorityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
     marginRight: 8,
   },
   priorityText: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#fff',
     fontWeight: 'bold',
     textTransform: 'uppercase',
   },
   categoryBadge: {
     backgroundColor: '#e3f2fd',
-    height: 24,
-    marginRight: 8,
   },
   categoryText: {
     fontSize: 11,
     color: '#1976d2',
     fontWeight: '600',
   },
-  dueDate: {
-    fontSize: 12,
+  taskDescription: {
+    fontSize: 14,
     color: '#666',
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  dueDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  dueDateText: {
+    fontSize: 13,
+    color: '#666',
+    marginLeft: 6,
+  },
+  overdue: {
+    color: '#f44336',
+    fontWeight: '600',
   },
   fab: {
     position: 'absolute',
@@ -536,20 +561,23 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+  },
+  modalScrollView: {
+    flex: 1,
   },
   modalContent: {
     backgroundColor: '#fff',
+    marginTop: 60,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 24,
-    maxHeight: '90%',
+    minHeight: '95%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   modalTitle: {
     fontSize: 20,
@@ -561,7 +589,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
-    marginTop: 12,
+    marginTop: 8,
   },
   input: {
     borderWidth: 1,
@@ -591,7 +619,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 8,
-    padding: 14,
+    padding: 12,
     marginBottom: 16,
     backgroundColor: '#fafafa',
   },
@@ -602,6 +630,5 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginTop: 8,
-    marginBottom: 20,
   },
 });
