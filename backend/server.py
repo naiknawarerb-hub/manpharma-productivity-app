@@ -199,6 +199,67 @@ class RecurringTaskUpdate(BaseModel):
     next_due_date: Optional[datetime] = None
     is_active: Optional[bool] = None
 
+# ===================== SOCIAL MEDIA AUTOMATION MODELS =====================
+
+class SocialConnection(BaseModel):
+    platform: str  # meta_instagram, meta_facebook, youtube, google_sheets
+    account_name: str
+    access_token: str
+    refresh_token: Optional[str] = None
+    token_expires_at: Optional[datetime] = None
+    is_active: bool = True
+    connected_date: datetime = Field(default_factory=datetime.utcnow)
+
+class SocialConnectionUpdate(BaseModel):
+    account_name: Optional[str] = None
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    token_expires_at: Optional[datetime] = None
+    is_active: Optional[bool] = None
+
+class ScheduledPost(BaseModel):
+    topic: str
+    caption: str
+    platform: str  # instagram, facebook, youtube
+    media_url: Optional[str] = ""
+    hashtags: Optional[str] = ""
+    scheduled_date: datetime
+    scheduled_time: str  # HH:MM format
+    priority: str = "medium"  # low, medium, high
+    status: str = "scheduled"  # scheduled, posted, failed, cancelled
+    notes: Optional[str] = ""
+    sheet_row_id: Optional[str] = None  # For tracking Google Sheets source
+    created_date: datetime = Field(default_factory=datetime.utcnow)
+
+class ScheduledPostUpdate(BaseModel):
+    topic: Optional[str] = None
+    caption: Optional[str] = None
+    platform: Optional[str] = None
+    media_url: Optional[str] = None
+    hashtags: Optional[str] = None
+    scheduled_date: Optional[datetime] = None
+    scheduled_time: Optional[str] = None
+    priority: Optional[str] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
+class PostingLog(BaseModel):
+    post_id: str
+    platform: str
+    topic: str
+    posted_at: datetime = Field(default_factory=datetime.utcnow)
+    status: str  # success, failed
+    platform_post_id: Optional[str] = None  # ID from platform API
+    error_message: Optional[str] = None
+    response_data: Optional[Dict] = None
+
+class GoogleSheetsConfig(BaseModel):
+    sheet_id: str
+    sheet_name: str = "Content Schedule"
+    auto_sync: bool = False
+    sync_frequency_minutes: int = 60
+    last_sync: Optional[datetime] = None
+
 # ===================== VIDEO PROJECTS ROUTES =====================
 
 @api_router.post("/videos")
