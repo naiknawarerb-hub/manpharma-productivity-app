@@ -6,14 +6,15 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card } from 'react-native-paper';
+import { useRouter } from 'expo-router';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
 export default function DashboardScreen() {
+  const router = useRouter();
   const [stats, setStats] = useState({
     videos_in_progress: 0,
     upcoming_calendar_items: 0,
@@ -64,6 +65,17 @@ export default function DashboardScreen() {
     </Card>
   );
 
+  const QuickAction = ({ icon, label, onPress, color }: any) => (
+    <TouchableOpacity
+      style={[styles.quickActionButton, { backgroundColor: color }]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <MaterialCommunityIcons name={icon} size={24} color="#fff" />
+      <Text style={styles.quickActionText}>{label}</Text>
+    </TouchableOpacity>
+  );
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -112,22 +124,6 @@ export default function DashboardScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quick Stats</Text>
-        <View style={styles.quickStatsRow}>
-          <View style={styles.quickStatCard}>
-            <MaterialCommunityIcons name="video" size={28} color="#6200ee" />
-            <Text style={styles.quickStatValue}>{stats.total_videos}</Text>
-            <Text style={styles.quickStatLabel}>Total Videos</Text>
-          </View>
-          <View style={styles.quickStatCard}>
-            <MaterialCommunityIcons name="book-open" size={28} color="#4CAF50" />
-            <Text style={styles.quickStatValue}>{stats.total_study_notes}</Text>
-            <Text style={styles.quickStatLabel}>Study Notes</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Income Snapshot</Text>
         <Card style={[styles.statCard, { borderLeftColor: '#4CAF50' }]}>
           <View style={styles.statContent}>
@@ -135,11 +131,11 @@ export default function DashboardScreen() {
               <MaterialCommunityIcons name="currency-inr" size={32} color="#4CAF50" />
             </View>
             <View style={styles.statText}>
-              <Text style={styles.statValue}>₹{stats.monthly_income.toFixed(2)}</Text>
+              <Text style={styles.statValue}>₹{stats.monthly_income.toFixed(0)}</Text>
               <Text style={styles.statTitle}>This Month (Received)</Text>
               {stats.pending_payments > 0 && (
                 <Text style={styles.statSubtitle}>
-                  ₹{stats.pending_payments.toFixed(2)} pending
+                  ₹{stats.pending_payments.toFixed(0)} pending
                 </Text>
               )}
             </View>
@@ -149,7 +145,7 @@ export default function DashboardScreen() {
 
       {stats.urgent_tasks && stats.urgent_tasks.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Urgent Tasks ⚠️</Text>
+          <Text style={styles.sectionTitle}>⚠️ Urgent Tasks</Text>
           {stats.urgent_tasks.map((task: any) => (
             <Card key={task._id} style={styles.urgentTaskCard}>
               <Card.Content>
@@ -168,15 +164,59 @@ export default function DashboardScreen() {
 
       <View style={styles.quickActions}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.actionButtonsRow}>
-          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#6200ee' }]}>
-            <MaterialCommunityIcons name="plus" size={24} color="#fff" />
-            <Text style={styles.actionButtonText}>New Video</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#03A9F4' }]}>
-            <MaterialCommunityIcons name="calendar-plus" size={24} color="#fff" />
-            <Text style={styles.actionButtonText}>Schedule Post</Text>
-          </TouchableOpacity>
+        <View style={styles.actionGrid}>
+          <QuickAction
+            icon="plus-circle"
+            label="Add Task"
+            color="#6200ee"
+            onPress={() => router.push('/(tabs)/tasks')}
+          />
+          <QuickAction
+            icon="calendar-plus"
+            label="Schedule Post"
+            color="#03A9F4"
+            onPress={() => router.push('/(tabs)/content')}
+          />
+          <QuickAction
+            icon="currency-inr"
+            label="Add Revenue"
+            color="#4CAF50"
+            onPress={() => router.push('/(tabs)/business')}
+          />
+          <QuickAction
+            icon="lightbulb-on"
+            label="Add Idea"
+            color="#FF9800"
+            onPress={() => router.push('/(tabs)/ideas')}
+          />
+          <QuickAction
+            icon="video-plus"
+            label="New Video"
+            color="#9C27B0"
+            onPress={() => router.push('/(tabs)/content')}
+          />
+          <QuickAction
+            icon="chart-line"
+            label="Analytics"
+            color="#E91E63"
+            onPress={() => router.push('/(tabs)/business')}
+          />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Quick Stats</Text>
+        <View style={styles.quickStatsRow}>
+          <View style={styles.quickStatCard}>
+            <MaterialCommunityIcons name="video" size={28} color="#6200ee" />
+            <Text style={styles.quickStatValue}>{stats.total_videos}</Text>
+            <Text style={styles.quickStatLabel}>Total Videos</Text>
+          </View>
+          <View style={styles.quickStatCard}>
+            <MaterialCommunityIcons name="book-open" size={28} color="#4CAF50" />
+            <Text style={styles.quickStatValue}>{stats.total_study_notes}</Text>
+            <Text style={styles.quickStatLabel}>Study Notes</Text>
+          </View>
         </View>
       </View>
     </ScrollView>
@@ -292,24 +332,26 @@ const styles = StyleSheet.create({
   },
   quickActions: {
     marginTop: 8,
+    marginBottom: 16,
   },
-  actionButtonsRow: {
+  actionGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  actionButton: {
-    flex: 1,
+  quickActionButton: {
+    width: '48%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
     borderRadius: 12,
-    marginHorizontal: 6,
-    elevation: 2,
+    marginBottom: 12,
+    elevation: 3,
   },
-  actionButtonText: {
+  quickActionText: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     marginLeft: 8,
   },
