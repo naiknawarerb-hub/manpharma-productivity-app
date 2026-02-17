@@ -9,8 +9,6 @@ import {
   TextInput,
   Modal,
   Alert,
-  Platform,
-  Keyboard,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Button, ProgressBar } from 'react-native-paper';
@@ -38,8 +36,9 @@ export default function VideosScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  const [showDueDatePicker, setShowDueDatePicker] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  const [showDueDatePicker, setShowDueDatePicker] = useState(false);
   
   const [newVideo, setNewVideo] = useState({
     title: '',
@@ -69,27 +68,6 @@ export default function VideosScreen() {
     fetchVideos();
   };
 
-  const openModal = (video?: Video) => {
-    if (video) {
-      setSelectedVideo(video);
-      setNewVideo({
-        title: video.title,
-        description: video.description,
-        due_date: video.due_date ? new Date(video.due_date) : new Date(),
-      });
-    } else {
-      setSelectedVideo(null);
-      const nextWeek = new Date();
-      nextWeek.setDate(nextWeek.getDate() + 7);
-      setNewVideo({
-        title: '',
-        description: '',
-        due_date: nextWeek,
-      });
-    }
-    setModalVisible(true);
-  };
-
   const createVideo = async () => {
     if (!newVideo.title.trim()) {
       Alert.alert('Error', 'Please enter a video title');
@@ -97,14 +75,8 @@ export default function VideosScreen() {
     }
 
     try {
-      const url = selectedVideo
-        ? `${BACKEND_URL}/api/videos/${selectedVideo._id}`
-        : `${BACKEND_URL}/api/videos`;
-      
-      const method = selectedVideo ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
+      const response = await fetch(`${BACKEND_URL}/api/videos`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newVideo.title,
@@ -117,11 +89,10 @@ export default function VideosScreen() {
         setNewVideo({ title: '', description: '', due_date: new Date() });
         setModalVisible(false);
         fetchVideos();
-        Alert.alert('Success', `Video ${selectedVideo ? 'updated' : 'created'} successfully!`);
       }
     } catch (error) {
-      console.error('Error saving video:', error);
-      Alert.alert('Error', 'Failed to save video');
+      console.error('Error creating video:', error);
+      Alert.alert('Error', 'Failed to create video');
     }
   };
 
@@ -141,12 +112,11 @@ export default function VideosScreen() {
       fetchVideos();
     } catch (error) {
       console.error('Error updating stage:', error);
-      Alert.alert('Error', 'Failed to update stage');
     }
   };
 
   const deleteVideo = async (videoId: string) => {
-    Alert.alert('Delete Video', 'Are you sure you want to delete this video project?', [
+    Alert.alert('Delete Video', 'Are you sure you want to delete this video?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -157,7 +127,6 @@ export default function VideosScreen() {
               method: 'DELETE',
             });
             fetchVideos();
-            Alert.alert('Success', 'Video deleted successfully');
           } catch (error) {
             console.error('Error deleting video:', error);
           }
@@ -171,63 +140,30 @@ export default function VideosScreen() {
     return completed / stages.length;
   };
 
-  const isVideoCompleted = (video: Video) => {
-    return video.stages.every(stage => stage.completed);
-  };
-
-  const activeVideos = videos.filter(v => !isVideoCompleted(v));
-  const completedVideos = videos.filter(v => isVideoCompleted(v));
-
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <MaterialCommunityIcons name="loading" size={48} color="#6200ee" />
-        <Text style={styles.loadingText}>Loading videos...</Text>
-      </View>
-    );
-  }
-
-  const renderVideoCard = (video: Video, isCompleted: boolean = false) => {
+  const renderVideoCard = (video: Video) => {
     const progress = getProgress(video.stages);
     const completedStages = video.stages.filter((s) => s.completed).length;
 
     return (
-      <Card key={video._id} style={[styles.videoCard, isCompleted && styles.completedCard]}>
+      <Card key={video._id} style={styles.videoCard}>
         <Card.Content>
           <View style={styles.videoHeader}>
             <View style={styles.videoTitleContainer}>
-              <Text style={[styles.videoTitle, isCompleted && styles.completedText]}>
-                {video.title}
-              </Text>
+              <Text style={styles.videoTitle}>{video.title}</Text>
               {video.description ? (
-                <Text style={[styles.videoDescription, isCompleted && styles.completedText]} numberOfLines={2}>
-                  {video.description}
-                </Text>
+                <Text style={styles.videoDescription}>{video.description}</Text>
               ) : null}
             </View>
-            <View style={styles.actionButtons}>
-              <TouchableOpacity
-                onPress={() => openModal(video)}
-                style={styles.iconButton}
-                activeOpacity={0.7}
-              >
-                <MaterialCommunityIcons name="pencil" size={24} color="#6200ee" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => deleteVideo(video._id)}
-                style={styles.iconButton}
-                activeOpacity={0.7}
-              >
-                <MaterialCommunityIcons name="delete" size={24} color="#f44336" />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity onPress={() => deleteVideo(video._id)}>
+              <MaterialCommunityIcons name="delete" size={24} color="#f44336" />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.progressContainer}>
             <Text style={styles.progressText}>
               {completedStages} / {video.stages.length} stages completed
             </Text>
-            <ProgressBar progress={progress} color={isCompleted ? '#4CAF50' : '#6200ee'} style={styles.progressBar} />
+            <ProgressBar progress={progress} color="#6200ee" style={styles.progressBar} />
           </View>
 
           <View style={styles.stagesContainer}>
@@ -235,9 +171,7 @@ export default function VideosScreen() {
               <TouchableOpacity
                 key={index}
                 style={styles.stageItem}
-                onPress={() => !isCompleted && toggleStage(video, index)}
-                disabled={isCompleted}
-                activeOpacity={0.7}
+                onPress={() => toggleStage(video, index)}
               >
                 <MaterialCommunityIcons
                   name={stage.completed ? 'checkbox-marked-circle' : 'checkbox-blank-circle-outline'}
@@ -269,6 +203,15 @@ export default function VideosScreen() {
     );
   };
 
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <MaterialCommunityIcons name="loading" size={48} color="#6200ee" />
+        <Text style={styles.loadingText}>Loading videos...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -278,29 +221,20 @@ export default function VideosScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <Text style={styles.sectionTitle}>Active Projects</Text>
-        {activeVideos.length === 0 ? (
+        {videos.length === 0 ? (
           <View style={styles.emptyContainer}>
             <MaterialCommunityIcons name="video-off" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>No active videos</Text>
+            <Text style={styles.emptyText}>No videos yet</Text>
             <Text style={styles.emptySubtext}>Create your first video project</Text>
           </View>
         ) : (
-          activeVideos.map(video => renderVideoCard(video))
-        )}
-
-        {completedVideos.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Completed Projects</Text>
-            {completedVideos.map(video => renderVideoCard(video, true))}
-          </>
+          videos.map(renderVideoCard)
         )}
       </ScrollView>
 
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => openModal()}
-        activeOpacity={0.8}
+        onPress={() => setModalVisible(true)}
       >
         <MaterialCommunityIcons name="plus" size={28} color="#fff" />
       </TouchableOpacity>
@@ -311,75 +245,65 @@ export default function VideosScreen() {
         transparent={true}
         onRequestClose={() => setModalVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => Keyboard.dismiss()}
-        >
-          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {selectedVideo ? 'Edit Video Project' : 'New Video Project'}
-              </Text>
+              <Text style={styles.modalTitle}>New Video Project</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <MaterialCommunityIcons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <TextInput
-                style={styles.input}
-                placeholder="Video Title *"
-                value={newVideo.title}
-                onChangeText={(text) => setNewVideo({ ...newVideo, title: text })}
+            <TextInput
+              style={styles.input}
+              placeholder="Video Title *"
+              value={newVideo.title}
+              onChangeText={(text) => setNewVideo({ ...newVideo, title: text })}
+            />
+
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Description (optional)"
+              value={newVideo.description}
+              onChangeText={(text) => setNewVideo({ ...newVideo, description: text })}
+              multiline
+              numberOfLines={3}
+            />
+
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowDueDatePicker(true)}
+            >
+              <MaterialCommunityIcons name="calendar" size={20} color="#666" />
+              <Text style={styles.dateButtonText}>
+                Due: {newVideo.due_date.toLocaleDateString()}
+              </Text>
+            </TouchableOpacity>
+
+            {showDueDatePicker && (
+              <DateTimePicker
+                value={newVideo.due_date}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowDueDatePicker(false);
+                  if (selectedDate) {
+                    setNewVideo({ ...newVideo, due_date: selectedDate });
+                  }
+                }}
               />
+            )}
 
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Description (optional)"
-                value={newVideo.description}
-                onChangeText={(text) => setNewVideo({ ...newVideo, description: text })}
-                multiline
-                numberOfLines={3}
-              />
-
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowDueDatePicker(true)}
-                activeOpacity={0.7}
-              >
-                <MaterialCommunityIcons name="calendar" size={20} color="#6200ee" />
-                <Text style={styles.dateButtonText}>
-                  Due: {newVideo.due_date.toLocaleDateString()}
-                </Text>
-              </TouchableOpacity>
-
-              {showDueDatePicker && (
-                <DateTimePicker
-                  value={newVideo.due_date}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  minimumDate={new Date()}
-                  onChange={(event, selectedDate) => {
-                    setShowDueDatePicker(Platform.OS === 'ios');
-                    if (selectedDate) {
-                      setNewVideo({ ...newVideo, due_date: selectedDate });
-                    }
-                  }}
-                />
-              )}
-
-              <Button
-                mode="contained"
-                onPress={createVideo}
-                style={styles.createButton}
-                buttonColor="#6200ee"
-              >
-                {selectedVideo ? 'Update Video' : 'Create Video'}
-              </Button>
-            </ScrollView>
+            <Button
+              mode="contained"
+              onPress={createVideo}
+              style={styles.createButton}
+              buttonColor="#6200ee"
+            >
+              Create Video
+            </Button>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </View>
   );
@@ -408,16 +332,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 12,
-    marginTop: 8,
-  },
   emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 48,
+    paddingTop: 100,
   },
   emptyText: {
     fontSize: 20,
@@ -436,10 +355,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     elevation: 2,
   },
-  completedCard: {
-    backgroundColor: '#f9f9f9',
-    opacity: 0.9,
-  },
   videoHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -455,21 +370,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1a1a1a',
   },
-  completedText: {
-    textDecorationLine: 'line-through',
-    color: '#999',
-  },
   videoDescription: {
     fontSize: 14,
     color: '#666',
     marginTop: 4,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-  },
-  iconButton: {
-    padding: 4,
-    marginLeft: 8,
   },
   progressContainer: {
     marginBottom: 16,
@@ -567,18 +471,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 8,
-    padding: 14,
+    padding: 12,
     marginBottom: 16,
     backgroundColor: '#fafafa',
   },
   dateButtonText: {
     fontSize: 16,
     color: '#333',
-    marginLeft: 12,
-    flex: 1,
+    marginLeft: 8,
   },
   createButton: {
     marginTop: 8,
-    marginBottom: 20,
   },
 });
