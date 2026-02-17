@@ -9,8 +9,6 @@ import {
   TextInput,
   Modal,
   Alert,
-  Platform,
-  Keyboard,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Button, Chip } from 'react-native-paper';
@@ -37,14 +35,12 @@ export default function CalendarScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
   
   const [formData, setFormData] = useState({
     title: '',
     content_type: 'Video',
     scheduled_date: new Date(),
-    scheduled_time: new Date(),
     status: 'draft',
     platform: '',
     description: '',
@@ -79,27 +75,21 @@ export default function CalendarScreen() {
   const openModal = (item?: CalendarItem) => {
     if (item) {
       setSelectedItem(item);
-      const itemDate = new Date(item.scheduled_date);
       setFormData({
         title: item.title,
         content_type: item.content_type,
-        scheduled_date: itemDate,
-        scheduled_time: itemDate,
+        scheduled_date: new Date(item.scheduled_date),
         status: item.status,
         platform: item.platform,
         description: item.description,
       });
     } else {
       setSelectedItem(null);
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(10, 0, 0, 0);
       setFormData({
         title: '',
         content_type: 'Video',
-        scheduled_date: tomorrow,
-        scheduled_time: tomorrow,
-        status: 'scheduled',
+        scheduled_date: new Date(),
+        status: 'draft',
         platform: '',
         description: '',
       });
@@ -114,11 +104,6 @@ export default function CalendarScreen() {
     }
 
     try {
-      // Combine date and time
-      const scheduledDateTime = new Date(formData.scheduled_date);
-      scheduledDateTime.setHours(formData.scheduled_time.getHours());
-      scheduledDateTime.setMinutes(formData.scheduled_time.getMinutes());
-
       const url = selectedItem
         ? `${BACKEND_URL}/api/calendar/${selectedItem._id}`
         : `${BACKEND_URL}/api/calendar`;
@@ -130,14 +115,13 @@ export default function CalendarScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          scheduled_date: scheduledDateTime.toISOString(),
+          scheduled_date: formData.scheduled_date.toISOString(),
         }),
       });
 
       if (response.ok) {
         setModalVisible(false);
         fetchItems();
-        Alert.alert('Success', `Post ${selectedItem ? 'updated' : 'scheduled'} successfully!`);
       }
     } catch (error) {
       console.error('Error saving calendar item:', error);
@@ -146,7 +130,7 @@ export default function CalendarScreen() {
   };
 
   const deleteItem = async (itemId: string) => {
-    Alert.alert('Delete Item', 'Are you sure you want to delete this scheduled post?', [
+    Alert.alert('Delete Item', 'Are you sure you want to delete this item?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -157,7 +141,6 @@ export default function CalendarScreen() {
               method: 'DELETE',
             });
             fetchItems();
-            Alert.alert('Success', 'Post deleted successfully');
           } catch (error) {
             console.error('Error deleting item:', error);
           }
@@ -170,25 +153,16 @@ export default function CalendarScreen() {
     const marked: any = {};
     items.forEach((item) => {
       const date = new Date(item.scheduled_date).toISOString().split('T')[0];
-      if (!marked[date]) {
-        marked[date] = { dots: [] };
-      }
-      const dotColor = item.status === 'posted' ? '#4CAF50' : item.status === 'scheduled' ? '#03A9F4' : '#FF9800';
-      marked[date].dots = marked[date].dots || [];
-      marked[date].dots.push({ color: dotColor });
-      marked[date].marked = true;
-    });
-    
-    if (marked[selectedDate]) {
-      marked[selectedDate].selected = true;
-      marked[selectedDate].selectedColor = '#6200ee';
-    } else {
-      marked[selectedDate] = {
-        selected: true,
-        selectedColor: '#6200ee',
+      marked[date] = {
+        marked: true,
+        dotColor: item.status === 'posted' ? '#4CAF50' : item.status === 'scheduled' ? '#03A9F4' : '#FF9800',
       };
-    }
-    
+    });
+    marked[selectedDate] = {
+      ...marked[selectedDate],
+      selected: true,
+      selectedColor: '#6200ee',
+    };
     return marked;
   };
 
@@ -225,109 +199,74 @@ export default function CalendarScreen() {
           current={selectedDate}
           onDayPress={(day) => setSelectedDate(day.dateString)}
           markedDates={getMarkedDates()}
-          markingType="multi-dot"
           theme={{
             selectedDayBackgroundColor: '#6200ee',
             todayTextColor: '#6200ee',
             arrowColor: '#6200ee',
-            monthTextColor: '#1a1a1a',
-            textMonthFontWeight: 'bold',
-            textMonthFontSize: 18,
           }}
           style={styles.calendar}
         />
 
         <View style={styles.itemsContainer}>
-          <View style={styles.dateHeader}>
-            <Text style={styles.dateTitle}>
-              {new Date(selectedDate).toLocaleDateString('en-US', {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-              })}
-            </Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => openModal()}
-              activeOpacity={0.7}
-            >
-              <MaterialCommunityIcons name="plus-circle" size={32} color="#6200ee" />
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.dateTitle}>
+            {new Date(selectedDate).toLocaleDateString('en-US', {
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+            })}
+          </Text>
 
           {filteredItems.length === 0 ? (
             <View style={styles.emptyContainer}>
               <MaterialCommunityIcons name="calendar-blank" size={48} color="#ccc" />
-              <Text style={styles.emptyText}>No posts scheduled</Text>
-              <Text style={styles.emptySubtext}>Tap + to schedule content</Text>
+              <Text style={styles.emptyText}>No items scheduled</Text>
             </View>
           ) : (
             filteredItems.map((item) => (
               <Card key={item._id} style={styles.itemCard}>
-                <Card.Content>
-                  <View style={styles.itemHeader}>
-                    <View style={styles.itemTitleContainer}>
-                      <Text style={styles.itemTitle}>{item.title}</Text>
-                      <View style={styles.badgesRow}>
-                        <Chip
-                          style={[styles.badge, { backgroundColor: getStatusColor(item.status) + '20' }]}
-                          textStyle={[styles.badgeText, { color: getStatusColor(item.status) }]}
-                        >
-                          {item.status}
-                        </Chip>
-                        <Chip style={styles.typeBadge} textStyle={styles.typeBadgeText}>
-                          {item.content_type}
-                        </Chip>
+                <TouchableOpacity onPress={() => openModal(item)}>
+                  <Card.Content>
+                    <View style={styles.itemHeader}>
+                      <View style={styles.itemTitleContainer}>
+                        <Text style={styles.itemTitle}>{item.title}</Text>
+                        <View style={styles.badgesRow}>
+                          <Chip
+                            style={[styles.badge, { backgroundColor: getStatusColor(item.status) + '20' }]}
+                            textStyle={[styles.badgeText, { color: getStatusColor(item.status) }]}
+                          >
+                            {item.status}
+                          </Chip>
+                          <Chip style={styles.typeBadge} textStyle={styles.typeBadgeText}>
+                            {item.content_type}
+                          </Chip>
+                        </View>
                       </View>
-                      <Text style={styles.timeText}>
-                        {new Date(item.scheduled_date).toLocaleTimeString('en-US', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </Text>
-                    </View>
-                    <View style={styles.actionButtons}>
-                      <TouchableOpacity
-                        onPress={() => openModal(item)}
-                        style={styles.iconButton}
-                        activeOpacity={0.7}
-                      >
-                        <MaterialCommunityIcons name="pencil" size={24} color="#6200ee" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => deleteItem(item._id)}
-                        style={styles.iconButton}
-                        activeOpacity={0.7}
-                      >
+                      <TouchableOpacity onPress={() => deleteItem(item._id)}>
                         <MaterialCommunityIcons name="delete" size={24} color="#f44336" />
                       </TouchableOpacity>
                     </View>
-                  </View>
 
-                  {item.platform ? (
-                    <View style={styles.platformContainer}>
-                      <MaterialCommunityIcons name="send" size={16} color="#666" />
-                      <Text style={styles.platformText}>{item.platform}</Text>
-                    </View>
-                  ) : null}
+                    {item.platform ? (
+                      <View style={styles.platformContainer}>
+                        <MaterialCommunityIcons name="cloud-upload" size={16} color="#666" />
+                        <Text style={styles.platformText}>{item.platform}</Text>
+                      </View>
+                    ) : null}
 
-                  {item.description ? (
-                    <Text style={styles.description} numberOfLines={2}>
-                      {item.description}
-                    </Text>
-                  ) : null}
-                </Card.Content>
+                    {item.description ? (
+                      <Text style={styles.description} numberOfLines={2}>
+                        {item.description}
+                      </Text>
+                    ) : null}
+                  </Card.Content>
+                </TouchableOpacity>
               </Card>
             ))
           )}
         </View>
       </ScrollView>
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => openModal()}
-        activeOpacity={0.8}
-      >
+      <TouchableOpacity style={styles.fab} onPress={() => openModal()}>
         <MaterialCommunityIcons name="plus" size={28} color="#fff" />
       </TouchableOpacity>
 
@@ -337,22 +276,18 @@ export default function CalendarScreen() {
         transparent={true}
         onRequestClose={() => setModalVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => Keyboard.dismiss()}
-        >
-          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {selectedItem ? 'Edit Schedule' : 'Schedule Post'}
-              </Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalScrollView}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {selectedItem ? 'Edit Schedule' : 'New Schedule'}
+                </Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <MaterialCommunityIcons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
               <TextInput
                 style={styles.input}
                 placeholder="Title *"
@@ -366,16 +301,11 @@ export default function CalendarScreen() {
                   <TouchableOpacity
                     key={type}
                     onPress={() => setFormData({ ...formData, content_type: type })}
-                    activeOpacity={0.7}
                   >
                     <Chip
                       selected={formData.content_type === type}
-                      style={[
-                        styles.chip,
-                        formData.content_type === type && styles.chipSelected
-                      ]}
+                      style={styles.chip}
                       selectedColor="#6200ee"
-                      textStyle={formData.content_type === type && styles.chipTextSelected}
                     >
                       {type}
                     </Chip>
@@ -389,16 +319,11 @@ export default function CalendarScreen() {
                   <TouchableOpacity
                     key={status}
                     onPress={() => setFormData({ ...formData, status })}
-                    activeOpacity={0.7}
                   >
                     <Chip
                       selected={formData.status === status}
-                      style={[
-                        styles.chip,
-                        formData.status === status && { backgroundColor: getStatusColor(status) + '30' }
-                      ]}
+                      style={styles.chip}
                       selectedColor={getStatusColor(status)}
-                      textStyle={formData.status === status && { fontWeight: 'bold' }}
                     >
                       {status}
                     </Chip>
@@ -412,14 +337,10 @@ export default function CalendarScreen() {
                   <TouchableOpacity
                     key={platform}
                     onPress={() => setFormData({ ...formData, platform })}
-                    activeOpacity={0.7}
                   >
                     <Chip
                       selected={formData.platform === platform}
-                      style={[
-                        styles.chip,
-                        formData.platform === platform && styles.chipSelected
-                      ]}
+                      style={styles.chip}
                       selectedColor="#6200ee"
                     >
                       {platform}
@@ -431,11 +352,10 @@ export default function CalendarScreen() {
               <TouchableOpacity
                 style={styles.dateButton}
                 onPress={() => setShowDatePicker(true)}
-                activeOpacity={0.7}
               >
-                <MaterialCommunityIcons name="calendar" size={20} color="#6200ee" />
+                <MaterialCommunityIcons name="calendar" size={20} color="#666" />
                 <Text style={styles.dateButtonText}>
-                  Date: {formData.scheduled_date.toLocaleDateString()}
+                  Scheduled: {formData.scheduled_date.toLocaleDateString()}
                 </Text>
               </TouchableOpacity>
 
@@ -443,40 +363,11 @@ export default function CalendarScreen() {
                 <DateTimePicker
                   value={formData.scheduled_date}
                   mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  minimumDate={new Date()}
+                  display="default"
                   onChange={(event, selectedDate) => {
-                    setShowDatePicker(Platform.OS === 'ios');
+                    setShowDatePicker(false);
                     if (selectedDate) {
                       setFormData({ ...formData, scheduled_date: selectedDate });
-                    }
-                  }}
-                />
-              )}
-
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowTimePicker(true)}
-                activeOpacity={0.7}
-              >
-                <MaterialCommunityIcons name="clock-outline" size={20} color="#6200ee" />
-                <Text style={styles.dateButtonText}>
-                  Time: {formData.scheduled_time.toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
-              </TouchableOpacity>
-
-              {showTimePicker && (
-                <DateTimePicker
-                  value={formData.scheduled_time}
-                  mode="time"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={(event, selectedTime) => {
-                    setShowTimePicker(Platform.OS === 'ios');
-                    if (selectedTime) {
-                      setFormData({ ...formData, scheduled_time: selectedTime });
                     }
                   }}
                 />
@@ -497,11 +388,11 @@ export default function CalendarScreen() {
                 style={styles.saveButton}
                 buttonColor="#6200ee"
               >
-                {selectedItem ? 'Update Schedule' : 'Schedule Post'}
+                {selectedItem ? 'Update' : 'Create'}
               </Button>
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
       </Modal>
     </View>
   );
@@ -535,19 +426,11 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 80,
   },
-  dateHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
   dateTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1a1a1a',
-  },
-  addButton: {
-    padding: 4,
+    marginBottom: 16,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -557,11 +440,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
     marginTop: 12,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#bbb',
-    marginTop: 4,
   },
   itemCard: {
     marginBottom: 12,
@@ -587,12 +465,11 @@ const styles = StyleSheet.create({
   badgesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 6,
+    marginTop: 4,
   },
   badge: {
     marginRight: 8,
     marginBottom: 4,
-    height: 26,
   },
   badgeText: {
     fontSize: 11,
@@ -601,24 +478,11 @@ const styles = StyleSheet.create({
   typeBadge: {
     backgroundColor: '#e3f2fd',
     marginBottom: 4,
-    height: 26,
   },
   typeBadgeText: {
     fontSize: 11,
     color: '#1976d2',
     fontWeight: '600',
-  },
-  timeText: {
-    fontSize: 14,
-    color: '#6200ee',
-    fontWeight: '600',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-  },
-  iconButton: {
-    padding: 4,
-    marginLeft: 8,
   },
   platformContainer: {
     flexDirection: 'row',
@@ -651,20 +515,23 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+  },
+  modalScrollView: {
+    flex: 1,
   },
   modalContent: {
     backgroundColor: '#fff',
+    marginTop: 60,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 24,
-    maxHeight: '90%',
+    minHeight: '95%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   modalTitle: {
     fontSize: 20,
@@ -676,7 +543,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
-    marginTop: 12,
+    marginTop: 8,
   },
   input: {
     borderWidth: 1,
@@ -700,31 +567,22 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
-  chipSelected: {
-    backgroundColor: '#6200ee20',
-  },
-  chipTextSelected: {
-    color: '#6200ee',
-    fontWeight: 'bold',
-  },
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 8,
-    padding: 14,
+    padding: 12,
     marginBottom: 16,
     backgroundColor: '#fafafa',
   },
   dateButtonText: {
     fontSize: 16,
     color: '#333',
-    marginLeft: 12,
-    flex: 1,
+    marginLeft: 8,
   },
   saveButton: {
     marginTop: 8,
-    marginBottom: 20,
   },
 });
